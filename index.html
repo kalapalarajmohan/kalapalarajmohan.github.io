@@ -211,6 +211,30 @@
     .pipeline { flex-direction: column; }
   }
 
+  /* live status widget */
+  .live-status {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 16px 20px;
+    margin-top: 24px;
+  }
+  .live-status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+  }
+  .live-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--ink-faint);
+    flex-shrink: 0;
+  }
+  .live-dot.on { background: var(--verified); box-shadow: 0 0 0 3px var(--verified-soft); }
+  .live-dot.stale { background: var(--unverified); box-shadow: 0 0 0 3px var(--unverified-soft); }
+  .live-sub { font-size: 12.5px; color: var(--ink-faint); margin-top: 8px; line-height: 1.4; }
+
   /* hardware photos */
   .hw-gallery {
     display: flex;
@@ -322,7 +346,7 @@
 <div class="hero">
   <div class="hero-grid"></div>
   <div class="wrap hero-inner">
-    <div class="eyebrow"><span class="dot"></span>contactless sensing pipeline — running since April 2026</div>
+    <div class="eyebrow"><span class="dot"></span>contactless sensing pipeline — currently in test deployment, own room</div>
     <h1 class="name">Kalapala Raj Mohan</h1>
     <p class="role">I build sensing hardware that has to work without wearables or cameras, because the person it's for won't accept either. Currently: WiFi CSI-based health monitoring, and a fall-detection airbag.</p>
     <svg class="trace" viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustrative CSI amplitude trace">
@@ -339,6 +363,22 @@
     <div class="trace-caption">illustrative CSI amplitude trace — subcarrier response over ~30s, annotated peaks are posture-shift events</div>
   </div>
 </div>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">where this stands right now</div>
+    <h2>In test deployment, my own room — not yet back with the person it's for</h2>
+    <p>The unit is currently running in my own room, not my mother's. Two honest reasons it hasn't gone back yet: first, the packet capture is <strong>bursty</strong> — 1 to nearly 3,000 packets/second, averaging ~30/s — which distorts frequency-based extraction like breathing rate if treated as evenly-sampled; I'm currently integrating a Lomb-Scargle periodogram (built for exactly this kind of irregular timing) to fix that properly before trusting numbers from it again. Second, and bigger: gross movement is already resolvable, but fine-grained posture and pre-pain guarding are not yet accurate enough to justify calling this equivalent to what a camera would show — that gap is the open research problem, not a bug I expect to close alone.</p>
+
+    <div class="live-status" id="liveStatus">
+      <div class="live-status-row">
+        <span class="live-dot" id="liveDot"></span>
+        <span id="liveText">No live feed configured for this view yet.</span>
+      </div>
+      <div class="live-sub" id="liveSub">Status widget is wired to read a small JSON file pushed periodically from the device — once that's set up, this will show the last confirmed reading and how long ago it was.</div>
+    </div>
+  </div>
+</section>
 
 <section>
   <div class="wrap">
@@ -430,7 +470,7 @@
     <p>The unsolved problem: gross repositioning (centimeter-scale) is resolvable with this setup. Pre-pain micro-muscular guarding — the signal that would actually matter — is micrometer-scale, sitting in the same 1–30 Hz band with no fixed reference frame during sleep. That gap is what the next phase of this work is about.</p>
 
     <div class="links">
-      <a href="https://github.com/kalapalarajmohan/amma-csi-pain-prediction">github.com/kalapalarajmohan/amma-csi-pain-prediction →</a>
+      <a href="https://github.com/kalapalarajmohan/amma-csi-sensing">github.com/kalapalarajmohan/amma-csi-sensing →</a>
     </div>
   </div>
 </section>
@@ -496,5 +536,46 @@
   </div>
 </footer>
 
+<script>
+// Tries to fetch status.json from the same repo (pushed periodically from
+// the Jetson via cron job). Fails gracefully with an honest "not
+// configured" message if the file doesn't exist yet — never fakes a
+// reading if there isn't one.
+(function () {
+  const dot = document.getElementById('liveDot');
+  const text = document.getElementById('liveText');
+  const sub = document.getElementById('liveSub');
+
+  function timeAgo(isoString) {
+    const then = new Date(isoString).getTime();
+    const now = Date.now();
+    const diffSec = Math.floor((now - then) / 1000);
+    if (diffSec < 60) return diffSec + 's ago';
+    if (diffSec < 3600) return Math.floor(diffSec / 60) + 'm ago';
+    if (diffSec < 86400) return Math.floor(diffSec / 3600) + 'h ago';
+    return Math.floor(diffSec / 86400) + 'd ago';
+  }
+
+  fetch('status.json', { cache: 'no-store' })
+    .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+    .then(data => {
+      const ago = timeAgo(data.timestamp);
+      const diffMin = (Date.now() - new Date(data.timestamp).getTime()) / 60000;
+      const isStale = diffMin > 15; // no reading in 15+ min = treat as offline
+      dot.className = 'live-dot ' + (isStale ? 'stale' : 'on');
+      text.textContent = isStale
+        ? `Offline — last reading: ${data.status || 'unknown'} (${ago})`
+        : `${data.status || 'unknown'} — last reading ${ago}`;
+      sub.textContent = isStale
+        ? 'No update in the last 15 minutes. Showing the last confirmed reading rather than a live one.'
+        : 'Live, pushed periodically from the device.';
+    })
+    .catch(() => {
+      dot.className = 'live-dot';
+      text.textContent = 'No live feed configured for this view yet.';
+      sub.textContent = "Status widget is wired to read a small JSON file pushed periodically from the device — once that's set up, this will show the last confirmed reading and how long ago it was.";
+    });
+})();
+</script>
 </body>
 </html>
