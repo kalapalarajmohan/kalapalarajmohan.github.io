@@ -449,17 +449,17 @@
       </div>
       <div class="stat">
         <div class="num">26/30</div>
-        <div class="lab">breathing-rate windows validated within 5 bpm of ground truth</div>
+        <div class="lab">breathing-rate windows where a second implementation matched the live pipeline within 5 bpm</div>
       </div>
       <div class="stat">
-        <div class="num">4/40</div>
-        <div class="lab">labeled nights toward target sample</div>
+        <div class="num">1</div>
+        <div class="lab">fully labeled night, out of 21 recordings; the 40-night target is paused</div>
       </div>
     </div>
 
     <div class="finding">
-      <span class="label">FINDING — VERIFIED</span>
-      <p><span class="mark verified">checked against ground truth</span>Breathing-rate extraction was independently validated on the actual deployment hardware, not just simulated — 26 of 30 sampled windows agreed within 5 bpm of a reference measurement.</p>
+      <span class="label">FINDING — CONSISTENCY CHECK</span>
+      <p><span class="mark unverified">consistency check, not ground truth</span>A second implementation of the breathing-rate method, run on real recorded packets from the deployment hardware, agreed with the live pipeline within 5 bpm on 26 of 30 sampled windows. Both use the same method and there is no reference device, so this shows the code does what I intended, not that the rates are correct.</p>
     </div>
 
     <div class="finding negative">
